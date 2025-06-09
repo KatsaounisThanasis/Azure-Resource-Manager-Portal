@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.cache/
+.pytest_cache/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env.txt
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Azure
+.azure/
+
+# VS Code
+.vscode/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Build directories
+build/
+dist/
+
+# Node modules (if any)
+node_modules/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation builds
+docs/_build/
+
+# Test artifacts
+test_deployment_payload.json
+
+# Development documentation
+*_CHECKLIST.md
+*_STATUS.md
+*_SUMMARY.md
+*_REPORT_*.md
+*_PROGRESS_*.md
+*_CHECK_*.md
+*_FIX.md
+main_clean.py
+
+# Project management files (exclude from GitHub)
+EXECUTION_PLAN.md
+GIT_OPTIMIZATION_GUIDE.md
+PROFESSIONAL_SHOWCASE_PACKAGE.md
+LINKEDIN_POST.md
+SCREENSHOT_*.md

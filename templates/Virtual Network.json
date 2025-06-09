@@ -1,0 +1,209 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.35.1.17967",
+      "templateHash": "13533925369419495043"
+    }
+  },
+  "parameters": {
+    "vnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "VNet name"
+      }
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "metadata": {
+        "description": "VNet Address prefix (e.g. 10.0.0.0/16)"
+      }
+    },
+    "subnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Subnet name"
+      }
+    },
+    "subnetAddressPrefix": {
+      "type": "string",
+      "metadata": {
+        "description": "Address prefix for the first subnet (e.g. 10.0.0.0/24)"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Location"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Tags"
+      }
+    },
+    "additionalSubnets": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Additional Subnets"
+      }
+    },
+    "enableDdosProtection": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable DDoS protection"
+      }
+    },
+    "ddosProtectionPlanId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "DDoS protection plan ID (required if DDoS protection is enabled)"
+      }
+    },
+    "enableVmProtection": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable VM protection"
+      }
+    },
+    "enableDnsServers": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable DNS servers"
+      }
+    },
+    "dnsServers": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Custom DNS servers"
+      }
+    },
+    "enableServiceEndpoints": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable service endpoints"
+      }
+    },
+    "serviceEndpoints": {
+      "type": "array",
+      "defaultValue": [],
+      "allowedValues": [
+        "Microsoft.AzureActiveDirectory",
+        "Microsoft.AzureCosmosDB",
+        "Microsoft.ContainerRegistry",
+        "Microsoft.EventHub",
+        "Microsoft.KeyVault",
+        "Microsoft.ServiceBus",
+        "Microsoft.Sql",
+        "Microsoft.Storage",
+        "Microsoft.Web"
+      ],
+      "metadata": {
+        "description": "Service endpoints to enable"
+      }
+    },
+    "enablePrivateEndpoints": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable private endpoints"
+      }
+    },
+    "enableNetworkPolicies": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable network policies"
+      }
+    }
+  },
+  "variables": {
+    "allSubnets": "[array(concat(createArray(createObject('name', parameters('subnetName'), 'properties', createObject('addressPrefix', parameters('subnetAddressPrefix'), 'serviceEndpoints', if(parameters('enableServiceEndpoints'), parameters('serviceEndpoints'), createArray()), 'privateEndpointNetworkPolicies', if(parameters('enablePrivateEndpoints'), 'Enabled', 'Disabled'), 'networkSecurityGroup', if(parameters('enableNetworkPolicies'), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', parameters('vnetName')))), null())))), parameters('additionalSubnets')))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2022-05-01",
+      "name": "[parameters('vnetName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetAddressPrefix')]"
+          ]
+        },
+        "subnets": "[variables('allSubnets')]",
+        "enableDdosProtection": "[parameters('enableDdosProtection')]",
+        "ddosProtectionPlan": "[if(parameters('enableDdosProtection'), createObject('id', parameters('ddosProtectionPlanId')), null())]",
+        "enableVmProtection": "[parameters('enableVmProtection')]",
+        "dhcpOptions": "[if(parameters('enableDnsServers'), createObject('dnsServers', parameters('dnsServers')), null())]"
+      }
+    },
+    {
+      "condition": "[parameters('enableNetworkPolicies')]",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2022-05-01",
+      "name": "[format('{0}-nsg', parameters('vnetName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "AllowVnetInBound",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "description": "Allow inbound traffic from VNet"
+            }
+          },
+          {
+            "name": "AllowAzureLoadBalancerInBound",
+            "properties": {
+              "priority": 110,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "AzureLoadBalancer",
+              "destinationAddressPrefix": "*",
+              "description": "Allow inbound traffic from Azure Load Balancer"
+            }
+          },
+          {
+            "name": "DenyAllInBound",
+            "properties": {
+              "priority": 120,
+              "direction": "Inbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "description": "Deny all inbound traffic"
+            }
+          }
+        ]
+      },
+      "tags": "[parameters('tags')]"
+    }
+  ]
+}

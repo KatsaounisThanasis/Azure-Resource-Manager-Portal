@@ -1,0 +1,119 @@
+name: Azure Deployment Test
+
+on:
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      subscription_id:
+        description: 'Azure Subscription ID for testing'
+        required: false
+        default: '578df036-8909-4621-b13a-dd9bbc5b93f1'
+      resource_group:
+        description: 'Resource Group for testing'
+        required: false
+        default: 'TestPortalRG'
+
+jobs:
+  azure-deployment-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Azure CLI Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Verify Azure connectivity
+      run: |
+        az account show
+        az group list --output table
+    
+    - name: Start backend server
+      run: |
+        cd backend
+        uvicorn main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+        echo "Backend server started"
+    
+    - name: Test API endpoints
+      run: |
+        # Test health endpoint
+        curl -f http://localhost:8000/ || exit 1
+        
+        # Test subscriptions endpoint
+        curl -f http://localhost:8000/api/subscriptions || exit 1
+        
+        # Test templates endpoint
+        curl -f http://localhost:8000/api/templates || exit 1
+        
+        echo "✅ All API endpoints responding"
+    
+    - name: Run deployment test
+      env:
+        AZURE_SUBSCRIPTION_ID: ${{ github.event.inputs.subscription_id || '578df036-8909-4621-b13a-dd9bbc5b93f1' }}
+        AZURE_RESOURCE_GROUP: ${{ github.event.inputs.resource_group || 'TestPortalRG' }}
+      run: |
+        python -c "
+        import requests
+        import json
+        import time
+        import os
+        
+        # Test deployment payload
+        payload = {
+            'subscription_id': os.environ['AZURE_SUBSCRIPTION_ID'],
+            'resource_group': os.environ['AZURE_RESOURCE_GROUP'],
+            'template_name': 'Storage Account',
+            'deployment_name': f'github-actions-test-{int(time.time())}',
+            'parameters': {
+                'storageAccountName': f'ghtest{int(time.time())}'
+            }
+        }
+        
+        print('🚀 Testing deployment via API...')
+        response = requests.post('http://localhost:8000/api/deploy', json=payload)
+        
+        if response.status_code == 200:
+            print('✅ Deployment API test successful')
+            print(f'Response: {response.json()}')
+        else:
+            print(f'❌ Deployment test failed: {response.status_code}')
+            print(f'Error: {response.text}')
+            exit(1)
+        "
+    
+    - name: Cleanup test resources
+      if: always()
+      run: |
+        echo "🧹 Cleaning up test resources..."
+        # List and clean up any test resources created
+        az storage account list --resource-group ${{ github.event.inputs.resource_group || 'TestPortalRG' }} --query "[?starts_with(name, 'ghtest')].name" -o tsv | while read account; do
+          echo "Deleting test storage account: $account"
+          az storage account delete --name "$account" --resource-group ${{ github.event.inputs.resource_group || 'TestPortalRG' }} --yes
+        done
+    
+    - name: Report test results
+      run: |
+        echo "🏆 Azure Deployment Test Summary:"
+        echo "✅ Backend server startup: Success"
+        echo "✅ API endpoints: All responding"
+        echo "✅ Azure connectivity: Verified"
+        echo "✅ Deployment API: Functional"
+        echo "✅ Cleanup: Completed"
+        echo ""
+        echo "🎯 Production deployment capability confirmed!"
