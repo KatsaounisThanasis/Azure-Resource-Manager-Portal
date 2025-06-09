@@ -5,7 +5,7 @@
 ![Azure](https://img.shields.io/badge/Azure-Ready-blue.svg)
 ![Tests](https://img.shields.io/badge/tests-100%25-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Production](https://img.shields.io/badge/status-Production%20Ready-brightgreen.svg)
+
 
 A production-ready web-based portal for managing Azure resources using Bicep templates. This application provides a comprehensive, user-friendly interface for deploying and managing Azure resources through ARM templates and Bicep templates with advanced features like real-time progress tracking, form validation, and responsive design.
 
