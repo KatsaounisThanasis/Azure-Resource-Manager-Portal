@@ -31,6 +31,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "key_vault_name" {
   description = "Name of the key vault (3-24 characters, alphanumeric and hyphens)"
   type        = string
@@ -44,11 +49,7 @@ variable "key_vault_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -62,9 +63,8 @@ variable "resource_group_name" {
 }
 
 variable "sku_name" {
-  description = "SKU for the key vault (standard or premium)"
+  description = "SKU for the key vault - affects features and cost (standard=software-protected keys, premium=adds HSM-protected keys)"
   type        = string
-  default     = "standard"
 
   validation {
     condition     = contains(["standard", "premium"], var.sku_name)

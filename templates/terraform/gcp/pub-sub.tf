@@ -74,7 +74,7 @@ variable "schema_name" {
 }
 
 variable "schema_type" {
-  description = "Schema type (AVRO or PROTOCOL_BUFFER)"
+  description = "Schema type - affects message validation format (AVRO or PROTOCOL_BUFFER)"
   type        = string
   default     = "AVRO"
 

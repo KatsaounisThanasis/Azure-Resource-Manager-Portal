@@ -27,6 +27,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "cosmos_account_name" {
   description = "Name of the Cosmos DB account"
   type        = string
@@ -40,11 +45,7 @@ variable "cosmos_account_name" {
 variable "location" {
   description = "Primary Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -69,9 +70,8 @@ variable "offer_type" {
 }
 
 variable "kind" {
-  description = "Kind of Cosmos DB account (GlobalDocumentDB for SQL API, MongoDB, etc.)"
+  description = "Kind of Cosmos DB account - affects API compatibility (GlobalDocumentDB for SQL API, MongoDB for MongoDB API)"
   type        = string
-  default     = "GlobalDocumentDB"
 
   validation {
     condition     = contains(["GlobalDocumentDB", "MongoDB"], var.kind)
@@ -80,9 +80,8 @@ variable "kind" {
 }
 
 variable "consistency_level" {
-  description = "Consistency level (BoundedStaleness, Eventual, Session, Strong, ConsistentPrefix)"
+  description = "Consistency level - affects performance and data consistency (Strong = highest consistency, Eventual = best performance, Session = balanced default)"
   type        = string
-  default     = "Session"
 
   validation {
     condition     = contains(["BoundedStaleness", "Eventual", "Session", "Strong", "ConsistentPrefix"], var.consistency_level)

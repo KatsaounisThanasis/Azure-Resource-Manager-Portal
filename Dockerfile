@@ -49,14 +49,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY backend/ ./backend/
 COPY templates/ ./templates/
-COPY examples/ ./examples/
+
+# Copy and setup entrypoint script
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Create logs directory
 RUN mkdir -p logs
 
-# Create non-root user for security
-RUN useradd -m -u 1000 apiuser && \
-    chown -R apiuser:apiuser /app
+# Create non-root user for security (but keep az cli access)
+# chmod entrypoint BEFORE creating user to ensure root ownership
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    useradd -m -u 1000 apiuser && \
+    chown -R apiuser:apiuser /app && \
+    mkdir -p /home/apiuser/.azure && \
+    chown -R apiuser:apiuser /home/apiuser/.azure
 
 # Switch to non-root user
 USER apiuser
@@ -68,5 +74,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Set default command
-CMD ["uvicorn", "backend.api_rest:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set default command (no entrypoint - Azure login done via docker-compose command)
+CMD ["uvicorn", "backend.api.routes:app", "--host", "0.0.0.0", "--port", "8000"]

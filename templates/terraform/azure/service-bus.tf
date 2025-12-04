@@ -26,6 +26,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "servicebus_namespace_name" {
   description = "Name of the Service Bus namespace (6-50 chars, alphanumeric and hyphens)"
   type        = string
@@ -39,11 +44,7 @@ variable "servicebus_namespace_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -57,9 +58,8 @@ variable "resource_group_name" {
 }
 
 variable "sku" {
-  description = "SKU for the Service Bus namespace (Basic, Standard, Premium)"
+  description = "SKU for the Service Bus namespace - affects cost and features (Basic=queues only, Standard=adds topics, Premium=adds dedicated capacity and VNet integration)"
   type        = string
-  default     = "Standard"
 
   validation {
     condition     = contains(["Basic", "Standard", "Premium"], var.sku)
@@ -91,9 +91,8 @@ variable "public_network_access_enabled" {
 }
 
 variable "minimum_tls_version" {
-  description = "Minimum TLS version"
+  description = "Minimum TLS version - affects security (1.2 recommended for security compliance)"
   type        = string
-  default     = "1.2"
 
   validation {
     condition     = contains(["1.0", "1.1", "1.2"], var.minimum_tls_version)

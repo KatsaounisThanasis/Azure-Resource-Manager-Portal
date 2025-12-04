@@ -9,7 +9,7 @@
 # Variables
 PYTHON := python3
 PIP := $(PYTHON) -m pip
-PYTEST := $(PYTHON) -m pytest
+PYTEST := $(PYTHON) -m pytest -c tests/pytest.ini
 BLACK := $(PYTHON) -m black
 ISORT := $(PYTHON) -m isort
 FLAKE8 := $(PYTHON) -m flake8
@@ -38,7 +38,7 @@ install: ## Install production dependencies
 install-dev: ## Install development and testing dependencies
 	@echo "$(BLUE)Installing development dependencies...$(NC)"
 	$(PIP) install -r requirements.txt
-	$(PIP) install -r requirements-test.txt
+	$(PIP) install -r tests/requirements-test.txt
 
 install-all: install install-dev ## Install all dependencies
 

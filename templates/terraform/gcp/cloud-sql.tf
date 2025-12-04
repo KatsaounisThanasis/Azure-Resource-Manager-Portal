@@ -43,15 +43,14 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "GCP region for deployment"
+  description = "GCP region for resource deployment"
   type        = string
-  default     = "us-central1"
+  default = "us-central1"
 }
 
 variable "database_version" {
-  description = "Database version (MYSQL_5_7, MYSQL_8_0, POSTGRES_13, POSTGRES_14, POSTGRES_15)"
+  description = "Database version - affects features and compatibility (MYSQL_5_7, MYSQL_8_0, POSTGRES_12-15)"
   type        = string
-  default     = "POSTGRES_15"
 
   validation {
     condition = contains([
@@ -63,7 +62,7 @@ variable "database_version" {
 }
 
 variable "tier" {
-  description = "Machine type tier (db-f1-micro, db-g1-small, db-n1-standard-1, etc.)"
+  description = "Machine type tier - affects cost and performance (db-f1-micro=shared CPU/low cost, db-g1-small=1 vCPU shared, db-n1-standard-1+=dedicated vCPUs)"
   type        = string
   default     = "db-f1-micro"
 }
@@ -80,9 +79,8 @@ variable "disk_size" {
 }
 
 variable "disk_type" {
-  description = "Disk type (PD_SSD or PD_HDD)"
+  description = "Disk type - affects cost and performance (PD_SSD=faster and more expensive, PD_HDD=slower and cheaper)"
   type        = string
-  default     = "PD_SSD"
 
   validation {
     condition     = contains(["PD_SSD", "PD_HDD"], var.disk_type)
@@ -103,9 +101,8 @@ variable "disk_autoresize_limit" {
 }
 
 variable "availability_type" {
-  description = "Availability type (ZONAL or REGIONAL for HA)"
+  description = "Availability type - affects cost and redundancy (ZONAL=single zone/lower cost, REGIONAL=high availability with automatic failover)"
   type        = string
-  default     = "ZONAL"
 
   validation {
     condition     = contains(["ZONAL", "REGIONAL"], var.availability_type)

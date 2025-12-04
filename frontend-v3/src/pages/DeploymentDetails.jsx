@@ -2,20 +2,63 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { deploymentAPI } from '../api/client';
 import Breadcrumbs from '../components/Breadcrumbs';
+import DeploymentLogViewer from '../components/DeploymentLogViewer';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 function DeploymentDetails() {
   const { id } = useParams();
   const [deployment, setDeployment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [taskInfo, setTaskInfo] = useState(null);
+
+  // Format template name - remove dashes and capitalize
+  const formatTemplateName = (name) => {
+    if (!name) return name;
+    return name
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Format provider type for display - hide backend implementation details
+  const formatProviderType = (providerType) => {
+    if (!providerType) return 'Unknown';
+    // Map all Azure variants to just "Azure"
+    if (providerType === 'bicep' || providerType === 'terraform-azure' || providerType === 'azure') {
+      return 'Azure';
+    }
+    // Map all GCP variants to just "Google Cloud"
+    if (providerType === 'terraform-gcp' || providerType === 'gcp') {
+      return 'Google Cloud';
+    }
+    return providerType;
+  };
 
   const fetchDeployment = async () => {
     try {
       const response = await deploymentAPI.getById(id);
-      setDeployment(response.data);
+      // API returns { success: true, data: {...} }
+      const deploymentData = response.data.data;
+      setDeployment(deploymentData);
+
+      // Fetch task info if deployment is running
+      if (deploymentData.celery_task_id && (deploymentData.status === 'pending' || deploymentData.status === 'running')) {
+        try {
+          const taskResponse = await deploymentAPI.getTaskStatus(deploymentData.celery_task_id);
+          if (taskResponse.data.success) {
+            setTaskInfo(taskResponse.data.data);
+          }
+        } catch (taskErr) {
+          console.error('Failed to fetch task status:', taskErr);
+          // Don't set error state for task status failures
+        }
+      }
+
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to fetch deployment');
+      setError(err.response?.data?.error || err.response?.data?.detail || err.message || 'Failed to fetch deployment');
     } finally {
       setLoading(false);
     }
@@ -129,13 +172,13 @@ function DeploymentDetails() {
               <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt className="text-sm font-medium text-gray-500">Template Name</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                  {deployment.template_name}
+                  {formatTemplateName(deployment.template_name)}
                 </dd>
               </div>
               <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt className="text-sm font-medium text-gray-500">Provider Type</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                  {deployment.provider_type}
+                  {formatProviderType(deployment.provider_type)}
                 </dd>
               </div>
               <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -216,39 +259,93 @@ function DeploymentDetails() {
           </div>
         )}
 
-        {/* Status Info for In-Progress Deployments */}
+        {/* Deployment Phase Progress */}
         {(deployment.status === 'pending' || deployment.status === 'running') && (
-          <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-5 w-5 text-blue-400 animate-spin"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-blue-700">
-                  This deployment is currently {deployment.status}. The page will auto-refresh every 3 seconds.
-                </p>
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                Deployment Progress
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Auto-refreshing every 3 seconds
+              </p>
+            </div>
+            <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+              {/* Phase Progress Indicator */}
+              <div className="space-y-4">
+                {/* Current Phase */}
+                {taskInfo && (
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <svg className="h-5 w-5 text-blue-500 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="text-sm font-medium text-gray-900">
+                        {taskInfo.status || 'Processing...'}
+                      </span>
+                    </div>
+                    <span className="text-sm text-gray-500">{taskInfo.progress}%</span>
+                  </div>
+                )}
+
+                {/* Progress Bar */}
+                {taskInfo && (
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${taskInfo.progress}%` }}
+                    ></div>
+                  </div>
+                )}
+
+                {/* Phase Steps */}
+                <div className="mt-6 space-y-3">
+                  {[
+                    { name: 'initializing', label: 'Initialization', icon: '🚀' },
+                    { name: 'validating', label: 'Validation', icon: '✓' },
+                    { name: 'planning', label: 'Planning', icon: '📋' },
+                    { name: 'applying', label: 'Applying', icon: '⚙️' },
+                    { name: 'finalizing', label: 'Finalizing', icon: '🎉' }
+                  ].map((phase) => {
+                    const isActive = taskInfo?.phase === phase.name;
+                    const isCompleted = taskInfo && ['validating', 'planning', 'applying', 'finalizing', 'completed'].indexOf(taskInfo.phase) >
+                                       ['initializing', 'validating', 'planning', 'applying', 'finalizing'].indexOf(phase.name);
+
+                    return (
+                      <div key={phase.name} className="flex items-center">
+                        <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${
+                          isActive ? 'bg-blue-100 ring-2 ring-blue-500' :
+                          isCompleted ? 'bg-green-100' : 'bg-gray-100'
+                        }`}>
+                          {isCompleted ? (
+                            <span className="text-green-600">✓</span>
+                          ) : isActive ? (
+                            <span className="text-blue-600 animate-pulse">{phase.icon}</span>
+                          ) : (
+                            <span className="text-gray-400">{phase.icon}</span>
+                          )}
+                        </div>
+                        <div className="ml-4">
+                          <p className={`text-sm font-medium ${
+                            isActive ? 'text-blue-600' :
+                            isCompleted ? 'text-green-600' : 'text-gray-500'
+                          }`}>
+                            {phase.label}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Real-time Log Viewer */}
+        {(deployment.status === 'pending' || deployment.status === 'running') && (
+          <DeploymentLogViewer deploymentId={deployment.deployment_id} apiBaseUrl={API_BASE_URL} />
         )}
       </div>
     </div>

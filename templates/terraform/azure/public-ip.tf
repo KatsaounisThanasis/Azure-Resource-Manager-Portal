@@ -27,6 +27,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "public_ip_name" {
   description = "Name of the public IP"
   type        = string
@@ -40,11 +45,7 @@ variable "public_ip_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -58,20 +59,14 @@ variable "resource_group_name" {
 }
 
 variable "allocation_method" {
-  description = "Allocation method for the public IP (Static or Dynamic)"
+  description = "Allocation method for the public IP - affects IP persistence (Static=IP never changes, Dynamic=IP may change when deallocated)"
   type        = string
-  default     = "Static"
-
-  validation {
-    condition     = contains(["Static", "Dynamic"], var.allocation_method)
-    error_message = "Allocation method must be Static or Dynamic"
-  }
+  default = "eastus"
 }
 
 variable "sku" {
-  description = "SKU for the public IP (Basic or Standard)"
+  description = "SKU for the public IP - affects features and cost (Basic=lower cost with limited features, Standard=zone-redundant with advanced features)"
   type        = string
-  default     = "Standard"
 
   validation {
     condition     = contains(["Basic", "Standard"], var.sku)
@@ -127,11 +122,6 @@ variable "availability_zone" {
   description = "Availability zone for the public IP (leave empty for non-zonal, or specify 1, 2, 3)"
   type        = string
   default     = ""
-
-  validation {
-    condition     = var.availability_zone == "" || contains(["1", "2", "3"], var.availability_zone)
-    error_message = "Availability zone must be empty, 1, 2, or 3"
-  }
 }
 
 variable "enable_ddos_protection" {

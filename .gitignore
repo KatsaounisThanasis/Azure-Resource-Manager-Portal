@@ -105,8 +105,41 @@ TEST_SUMMARY.md
 test-results/
 
 # ===== CRITICAL: Credentials - NEVER commit these! =====
+# GCP Service Account Keys
 credentials/*.json
 credentials/**/*.json
+*-service-account*.json
+*service_account*.json
+peppy-booth-*.json
+gcp-credentials*.json
+google-credentials*.json
+
+# AWS Credentials
+.aws/
+aws-credentials*.json
+~/.aws/credentials
+
+# Azure Credentials
+.azure/credentials
+azure-credentials*.json
+
+# SSH Keys & Certificates
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Database Dumps & Backups
+*.sql
+*.dump
+*.backup
+backup-*.tar.gz
+
+# JSON Files (with exceptions)
 *.json
 # Allow specific JSON files that are not credentials
 !package.json
@@ -117,6 +150,8 @@ credentials/**/*.json
 !frontend-v3/package.json
 !frontend-v3/package-lock.json
 !frontend-v3/tsconfig.json
+!pytest.json
+!.benchmarks/**/*.json
 
 # Frontend (React + Vite)
 frontend-v3/node_modules/

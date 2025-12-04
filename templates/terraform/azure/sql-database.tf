@@ -27,6 +27,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "sql_server_name" {
   description = "Name of the SQL server"
   type        = string
@@ -40,11 +45,7 @@ variable "sql_server_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -100,9 +101,13 @@ variable "sql_database_name" {
 }
 
 variable "sku_name" {
-  description = "SKU for the SQL database (Basic, S0-S12, P1-P15, GP_S_Gen5_1, etc.)"
+  description = "SKU for the SQL database - affects cost and performance (Basic for light workloads, S0-S12 for standard, P1-P15 for premium, GP_S_Gen5 for general purpose serverless)"
   type        = string
-  default     = "Basic"
+
+  validation {
+    condition     = can(regex("^(Basic|S[0-9]|S1[0-2]|P[1-9]|P1[0-5]|GP_S_Gen5_[1-9][0-9]?|GP_Gen5_[1-9][0-9]?|BC_Gen5_[1-9][0-9]?)$", var.sku_name))
+    error_message = "SKU must be a valid SQL Database SKU (Basic, S0-S12, P1-P15, GP_S_Gen5_X, GP_Gen5_X, or BC_Gen5_X)"
+  }
 }
 
 variable "max_size_gb" {
@@ -123,9 +128,8 @@ variable "collation" {
 }
 
 variable "license_type" {
-  description = "License type for the database (LicenseIncluded or BasePrice)"
+  description = "License type for the database - affects cost (LicenseIncluded = standard pricing, BasePrice = Azure Hybrid Benefit for cost savings with existing SQL licenses)"
   type        = string
-  default     = "LicenseIncluded"
 
   validation {
     condition     = contains(["LicenseIncluded", "BasePrice"], var.license_type)
@@ -169,9 +173,8 @@ variable "enable_public_network_access" {
 }
 
 variable "minimum_tls_version" {
-  description = "Minimum TLS version for the SQL server"
+  description = "Minimum TLS version for the SQL server - affects security (1.2 recommended for security compliance)"
   type        = string
-  default     = "1.2"
 
   validation {
     condition     = contains(["1.0", "1.1", "1.2"], var.minimum_tls_version)

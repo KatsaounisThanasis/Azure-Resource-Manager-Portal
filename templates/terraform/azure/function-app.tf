@@ -26,6 +26,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "function_app_name" {
   description = "Name of the function app"
   type        = string
@@ -39,11 +44,7 @@ variable "function_app_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -85,9 +86,8 @@ variable "app_service_plan_id" {
 }
 
 variable "sku_name" {
-  description = "SKU for the App Service Plan (Y1=Consumption, EP1=Elastic Premium, P1v2=Premium)"
+  description = "SKU for the App Service Plan - affects cost and features (Y1=Consumption/pay-per-execution, EP1-EP3=Elastic Premium with pre-warmed instances, P1v2-P3v2=Dedicated Premium for always-on workloads)"
   type        = string
-  default     = "Y1"
 
   validation {
     condition     = contains(["Y1", "EP1", "EP2", "EP3", "P1v2", "P2v2", "P3v2"], var.sku_name)
@@ -96,9 +96,8 @@ variable "sku_name" {
 }
 
 variable "os_type" {
-  description = "Operating system type for the App Service Plan"
+  description = "Operating system type for the App Service Plan - affects runtime compatibility (Linux recommended for most scenarios, Windows for .NET Framework)"
   type        = string
-  default     = "Linux"
 
   validation {
     condition     = contains(["Linux", "Windows"], var.os_type)
@@ -107,9 +106,8 @@ variable "os_type" {
 }
 
 variable "runtime_stack" {
-  description = "Runtime stack for the function app"
+  description = "Runtime stack for the function app - affects what language your functions are written in"
   type        = string
-  default     = "python"
 
   validation {
     condition     = contains(["dotnet", "node", "python", "java", "powershell"], var.runtime_stack)
@@ -124,9 +122,8 @@ variable "runtime_version" {
 }
 
 variable "functions_extension_version" {
-  description = "Azure Functions runtime version"
+  description = "Azure Functions runtime version - affects features (~4 recommended for latest features)"
   type        = string
-  default     = "~4"
 
   validation {
     condition     = contains(["~3", "~4"], var.functions_extension_version)

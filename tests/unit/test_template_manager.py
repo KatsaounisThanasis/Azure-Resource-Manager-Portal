@@ -4,7 +4,7 @@ Tests the actual implementation without complex mocking
 """
 import pytest
 from pathlib import Path
-from backend.template_manager import TemplateManager, TemplateFormat, CloudProvider
+from backend.services.template_manager import TemplateManager, TemplateFormat, CloudProvider
 
 
 class TestTemplateManagerBasic:
@@ -120,7 +120,7 @@ class TestTemplateManagerWithMockDirectory:
 
     def test_get_template_by_name(self, temp_templates_dir):
         """Test getting a specific template by name"""
-        from backend.template_manager import TemplateMetadata
+        from backend.services.template_manager import TemplateMetadata
 
         manager = TemplateManager(templates_root=str(temp_templates_dir))
 

@@ -1,8 +1,6 @@
 # Docker Compose for Multi-Cloud Infrastructure Management API
 # This provides an easy way to run the entire stack locally
 
-version: '3.8'
-
 services:
   # Main API service
   api:
@@ -43,9 +41,6 @@ services:
       # Mount templates for easy editing
       - ./templates:/app/templates
 
-      # Mount Azure CLI credentials
-      - ~/.azure:/root/.azure:ro
-
       # Mount GCP credentials (if using service account)
       - ${GCP_CREDENTIALS_PATH:-./credentials}:/app/credentials:ro
 
@@ -80,13 +75,48 @@ services:
       - postgres
       - redis
 
+  # Frontend React Application (Development)
+  frontend:
+    build:
+      context: ./frontend-v3
+      dockerfile: Dockerfile.dev
+    container_name: multicloud-frontend
+    ports:
+      - "5174:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend-v3/src:/app/src
+      - ./frontend-v3/public:/app/public
+      - ./frontend-v3/index.html:/app/index.html
+      - ./frontend-v3/vite.config.js:/app/vite.config.js
+      - ./frontend-v3/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend-v3/postcss.config.js:/app/postcss.config.js
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+    networks:
+      - multicloud-network
+    depends_on:
+      - api
+    restart: unless-stopped
+
   # Celery Worker for background tasks
   celery-worker:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: multicloud-worker
-    command: celery -A backend.celery_app worker --loglevel=info --concurrency=2 -Q celery,deployments,maintenance
+    # Azure login + start celery (shell form to allow env vars and chaining)
+    command: >
+      bash -c "
+        if [ -n \"$$AZURE_CLIENT_ID\" ] && [ -n \"$$AZURE_CLIENT_SECRET\" ] && [ -n \"$$AZURE_TENANT_ID\" ]; then
+          echo 'Logging in to Azure CLI...'
+          az login --service-principal -u $$AZURE_CLIENT_ID -p $$AZURE_CLIENT_SECRET --tenant $$AZURE_TENANT_ID --output none 2>/dev/null || echo 'Azure login failed'
+          echo 'Azure CLI configured'
+        fi
+        exec celery -A backend.tasks.celery_app worker --loglevel=info --concurrency=2 -Q celery,deployments,maintenance
+      "
     environment:
       # Database and Redis
       - DATABASE_URL=postgresql://apiuser:${DB_PASSWORD:-changeme}@postgres:5432/multicloud
@@ -109,7 +139,6 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./templates:/app/templates
-      - ~/.azure:/root/.azure:ro
       - ${GCP_CREDENTIALS_PATH:-./credentials}:/app/credentials:ro
       # Development: Mount code for hot reload
       - ./backend:/app/backend
@@ -119,6 +148,12 @@ services:
       - postgres
       - redis
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "celery", "-A", "backend.tasks.celery_app", "inspect", "ping", "-d", "celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Redis for Celery task queue
   redis:

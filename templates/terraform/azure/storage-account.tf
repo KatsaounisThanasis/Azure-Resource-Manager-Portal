@@ -1,6 +1,11 @@
 # Azure Storage Account via Terraform
 # This provides an alternative to Bicep for Azure deployments
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "storage_account_name" {
   type        = string
   description = "Name of the storage account (3-24 lowercase alphanumeric characters)"
@@ -18,14 +23,13 @@ variable "resource_group_name" {
 
 variable "location" {
   type        = string
-  description = "Azure region"
-  default     = "eastus"
+  description = "Azure region for resource deployment"
+  default = "eastus"
 }
 
 variable "account_tier" {
   type        = string
-  description = "Storage account tier"
-  default     = "Standard"
+  description = "Storage account tier - affects cost and features (Standard=general purpose, Premium=high performance for VMs and files)"
 
   validation {
     condition     = contains(["Standard", "Premium"], var.account_tier)
@@ -35,8 +39,7 @@ variable "account_tier" {
 
 variable "account_replication_type" {
   type        = string
-  description = "Replication type"
-  default     = "LRS"
+  description = "Replication type - affects cost and redundancy level (LRS=lowest cost/3 copies locally, ZRS=zone redundancy, GRS=geo-redundancy, RAGRS=read-access geo-redundancy)"
 
   validation {
     condition = contains([
@@ -65,7 +68,7 @@ resource "azurerm_storage_account" "main" {
 
   # Security settings
   min_tls_version                 = "TLS1_2"
-  enable_https_traffic_only       = true
+  https_traffic_only_enabled      = true
   allow_nested_items_to_be_public = false
 
   # Blob properties

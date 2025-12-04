@@ -27,6 +27,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "acr_name" {
   description = "Name of the container registry (5-50 chars, alphanumeric only)"
   type        = string
@@ -40,11 +45,7 @@ variable "acr_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -58,9 +59,8 @@ variable "resource_group_name" {
 }
 
 variable "sku" {
-  description = "SKU for the container registry (Basic, Standard, Premium)"
+  description = "SKU for the container registry - affects cost and features (Basic = 10GB storage, Standard = 100GB storage, Premium = 500GB storage with geo-replication and content trust)"
   type        = string
-  default     = "Standard"
 
   validation {
     condition     = contains(["Basic", "Standard", "Premium"], var.sku)
@@ -116,9 +116,8 @@ variable "trust_policy_enabled" {
 }
 
 variable "network_rule_set_default_action" {
-  description = "Default action for network rules (Allow or Deny)"
+  description = "Default action for network rules - affects security (Allow = open access, Deny = restricted access with firewall rules)"
   type        = string
-  default     = "Allow"
 
   validation {
     condition     = contains(["Allow", "Deny"], var.network_rule_set_default_action)

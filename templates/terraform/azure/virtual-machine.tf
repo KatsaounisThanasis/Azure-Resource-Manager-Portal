@@ -26,6 +26,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "vm_name" {
   description = "Name of the virtual machine"
   type        = string
@@ -39,11 +44,7 @@ variable "vm_name" {
 variable "location" {
   description = "Azure region for deployment (e.g., norwayeast, swedencentral)"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -57,14 +58,7 @@ variable "resource_group_name" {
 }
 
 variable "vm_size" {
-  description = "Size of the virtual machine (e.g., Standard_B2s, Standard_D2s_v3)"
-  type        = string
-  default     = "Standard_B2s"
-
-  validation {
-    condition     = can(regex("^Standard_[A-Z][0-9]+[a-z]*_v[0-9]+$|^Standard_[A-Z][0-9]+[a-z]*$", var.vm_size))
-    error_message = "VM size must be a valid Azure VM size (e.g., Standard_B2s, Standard_D2s_v3)"
-  }
+  description = "Size of the virtual machine - affects cost and performance (Standard_B1s=burstable/low cost, Standard_D2s_v3=general purpose, Standard_E2s_v3=memory optimized)"
 }
 
 variable "admin_username" {
@@ -90,9 +84,7 @@ variable "admin_password" {
 }
 
 variable "os_type" {
-  description = "Operating system type: Linux or Windows"
-  type        = string
-  default     = "Linux"
+  description = "Operating system type - affects licensing and features (Linux or Windows)"
 
   validation {
     condition     = contains(["Linux", "Windows"], var.os_type)
@@ -112,9 +104,8 @@ variable "os_disk_size_gb" {
 }
 
 variable "os_disk_type" {
-  description = "Type of the OS disk (Standard_LRS, StandardSSD_LRS, Premium_LRS)"
+  description = "Type of the OS disk - affects cost and performance (Standard_LRS=HDD, StandardSSD_LRS=balanced SSD, Premium_LRS=high performance SSD)"
   type        = string
-  default     = "StandardSSD_LRS"
 
   validation {
     condition     = contains(["Standard_LRS", "StandardSSD_LRS", "Premium_LRS", "UltraSSD_LRS"], var.os_disk_type)
@@ -199,11 +190,6 @@ variable "public_ip_allocation_method" {
   description = "Allocation method for the public IP (Static or Dynamic)"
   type        = string
   default     = "Dynamic"
-
-  validation {
-    condition     = contains(["Static", "Dynamic"], var.public_ip_allocation_method)
-    error_message = "Public IP allocation method must be Static or Dynamic"
-  }
 }
 
 variable "public_ip_sku" {

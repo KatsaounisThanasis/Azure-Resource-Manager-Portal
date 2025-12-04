@@ -27,6 +27,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "redis_name" {
   description = "Name of the Redis cache (globally unique)"
   type        = string
@@ -40,11 +45,7 @@ variable "redis_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -58,7 +59,7 @@ variable "resource_group_name" {
 }
 
 variable "capacity" {
-  description = "Cache capacity (0-6 for Basic/Standard, 1-5 for Premium)"
+  description = "Cache capacity - affects cost and memory size (0=250MB, 1=1GB, 2=2.5GB, 3=6GB, 4=13GB, 5=26GB, 6=53GB)"
   type        = number
   default     = 1
 
@@ -69,9 +70,8 @@ variable "capacity" {
 }
 
 variable "family" {
-  description = "SKU family (C for Basic/Standard, P for Premium)"
+  description = "SKU family - must match sku_name (C for Basic/Standard, P for Premium)"
   type        = string
-  default     = "C"
 
   validation {
     condition     = contains(["C", "P"], var.family)
@@ -80,9 +80,8 @@ variable "family" {
 }
 
 variable "sku_name" {
-  description = "SKU name (Basic, Standard, Premium)"
+  description = "SKU name - affects cost and features (Basic = no SLA, Standard = SLA with replication, Premium = SLA with clustering and persistence)"
   type        = string
-  default     = "Standard"
 
   validation {
     condition     = contains(["Basic", "Standard", "Premium"], var.sku_name)
@@ -97,9 +96,8 @@ variable "enable_non_ssl_port" {
 }
 
 variable "minimum_tls_version" {
-  description = "Minimum TLS version"
+  description = "Minimum TLS version - affects security (1.2 recommended for security compliance)"
   type        = string
-  default     = "1.2"
 
   validation {
     condition     = contains(["1.0", "1.1", "1.2"], var.minimum_tls_version)
@@ -114,9 +112,8 @@ variable "public_network_access_enabled" {
 }
 
 variable "redis_version" {
-  description = "Redis version (4 or 6)"
+  description = "Redis version - affects features (6 recommended for latest features and performance)"
   type        = string
-  default     = "6"
 
   validation {
     condition     = contains(["4", "6"], var.redis_version)
@@ -198,14 +195,6 @@ variable "zones" {
   description = "List of availability zones (Premium SKU only)"
   type        = list(string)
   default     = []
-
-  validation {
-    condition = alltrue([
-      for zone in var.zones :
-      contains(["1", "2", "3"], zone)
-    ])
-    error_message = "Zones must be 1, 2, or 3"
-  }
 }
 
 variable "redis_configuration" {

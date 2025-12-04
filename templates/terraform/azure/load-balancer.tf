@@ -28,6 +28,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "lb_name" {
   description = "Name of the load balancer"
   type        = string
@@ -41,11 +46,7 @@ variable "lb_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -59,9 +60,8 @@ variable "resource_group_name" {
 }
 
 variable "sku" {
-  description = "SKU for the load balancer (Basic or Standard)"
+  description = "SKU for the load balancer - affects features and cost (Basic=limited features, Standard=recommended with HA ports and availability zones)"
   type        = string
-  default     = "Standard"
 
   validation {
     condition     = contains(["Basic", "Standard"], var.sku)
@@ -70,9 +70,8 @@ variable "sku" {
 }
 
 variable "lb_type" {
-  description = "Type of load balancer (Public or Internal)"
+  description = "Type of load balancer (Public=internet-facing, Internal=private network only)"
   type        = string
-  default     = "Public"
 
   validation {
     condition     = contains(["Public", "Internal"], var.lb_type)
@@ -103,11 +102,6 @@ variable "public_ip_allocation_method" {
   description = "Allocation method for public IP (Static or Dynamic)"
   type        = string
   default     = "Static"
-
-  validation {
-    condition     = contains(["Static", "Dynamic"], var.public_ip_allocation_method)
-    error_message = "Public IP allocation method must be Static or Dynamic"
-  }
 }
 
 variable "public_ip_sku" {
@@ -138,11 +132,6 @@ variable "private_ip_address_allocation" {
   description = "Private IP allocation method (Static or Dynamic)"
   type        = string
   default     = "Dynamic"
-
-  validation {
-    condition     = contains(["Static", "Dynamic"], var.private_ip_address_allocation)
-    error_message = "Private IP allocation must be Static or Dynamic"
-  }
 }
 
 # Backend Pools

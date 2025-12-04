@@ -44,9 +44,9 @@ variable "project_id" {
 }
 
 variable "location" {
-  description = "GCP region for deployment"
+  description = "GCP region for resource deployment"
   type        = string
-  default     = "us-central1"
+  default = "US"
 }
 
 variable "image" {
@@ -66,13 +66,13 @@ variable "container_port" {
 }
 
 variable "cpu" {
-  description = "CPU allocation for each container instance (e.g., '1000m', '2')"
+  description = "CPU allocation for each container instance - affects cost and performance (e.g., '1000m'=1 vCPU, '2'=2 vCPUs)"
   type        = string
   default     = "1000m"
 }
 
 variable "memory" {
-  description = "Memory allocation for each container instance (e.g., '512Mi', '2Gi')"
+  description = "Memory allocation for each container instance - affects cost and performance (e.g., '512Mi', '2Gi')"
   type        = string
   default     = "512Mi"
 }

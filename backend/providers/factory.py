@@ -9,7 +9,6 @@ import logging
 from typing import Optional, Dict, Any
 
 from .base import CloudProvider, ProviderType, ProviderConfigurationError
-from .azure_native import AzureNativeProvider
 from .terraform_provider import TerraformProvider
 
 logger = logging.getLogger(__name__)
@@ -19,19 +18,21 @@ class ProviderFactory:
     """
     Factory class for creating cloud provider instances.
 
+    Note: All providers now use Terraform for multi-cloud support.
+
     Usage:
         provider = ProviderFactory.create_provider(
-            provider_type="azure",
+            provider_type="terraform-azure",
             subscription_id="xxx",
             region="eastus"
         )
     """
 
-    # Registry of available providers
+    # Registry of available providers - all use Terraform
     _providers: Dict[str, type] = {
-        "azure": AzureNativeProvider,
+        "terraform-azure": TerraformProvider,
+        "terraform-gcp": TerraformProvider,
         "gcp": TerraformProvider,
-        ProviderType.AZURE.value: AzureNativeProvider,
         ProviderType.TERRAFORM.value: TerraformProvider,
     }
 

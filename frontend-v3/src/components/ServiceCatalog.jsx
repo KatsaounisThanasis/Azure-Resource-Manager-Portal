@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { templateAPI } from '../api/client';
+import { formatTemplateName as formatName, formatProviderName } from '../utils/formatters';
 
 // Template categories and icons
 const CATEGORIES = {
@@ -46,9 +44,15 @@ const CATEGORIES = {
 function ServiceCatalog({ onSelectTemplate }) {
   const [provider, setProvider] = useState('azure');
   const [templates, setTemplates] = useState([]);
+  const [templateCounts, setTemplateCounts] = useState({ azure: 0, gcp: 0 });
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Fetch template counts on mount
+  useEffect(() => {
+    fetchTemplateCounts();
+  }, []);
 
   useEffect(() => {
     if (provider) {
@@ -56,10 +60,25 @@ function ServiceCatalog({ onSelectTemplate }) {
     }
   }, [provider]);
 
+  const fetchTemplateCounts = async () => {
+    try {
+      const [azureRes, gcpRes] = await Promise.all([
+        templateAPI.getTemplates('azure'),
+        templateAPI.getTemplates('gcp')
+      ]);
+      setTemplateCounts({
+        azure: azureRes.data.success ? azureRes.data.data.templates.length : 0,
+        gcp: gcpRes.data.success ? gcpRes.data.data.templates.length : 0
+      });
+    } catch (err) {
+      console.error('Failed to fetch template counts:', err);
+    }
+  };
+
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/templates?cloud=${provider}`);
+      const response = await templateAPI.getTemplates(provider);
       if (response.data.success) {
         setTemplates(response.data.data.templates);
       }
@@ -100,17 +119,36 @@ function ServiceCatalog({ onSelectTemplate }) {
     groupedTemplates[category].push(template);
   });
 
-  const formatTemplateName = (name) => {
-    return name
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+  // Note: Using imported formatName (smart formatter with acronym handling)
+
+  // Clean template description - remove separator lines
+  const cleanDescription = (description) => {
+    if (!description) return '';
+    // Remove lines that are just separators (=, -, _, etc.)
+    return description
+      .replace(/^[=\-_]+$/gm, '')  // Remove lines with only separators
+      .replace(/^\s*$/gm, '')       // Remove empty lines
+      .trim();
   };
 
-  const getTemplateIcon = (format) => {
-    if (format === 'terraform') return '🔧';
-    if (format === 'bicep') return '💪';
-    return '📄';
+  const getServiceIcon = (templateName) => {
+    // Return appropriate icon based on service type
+    if (templateName.includes('storage') || templateName.includes('bucket')) return '💾';
+    if (templateName.includes('vm') || templateName.includes('instance') || templateName.includes('compute')) return '💻';
+    if (templateName.includes('sql') || templateName.includes('database') || templateName.includes('cosmos')) return '🗄️';
+    if (templateName.includes('network') || templateName.includes('vpc') || templateName.includes('vnet')) return '🌐';
+    if (templateName.includes('function') || templateName.includes('app')) return '⚡';
+    if (templateName.includes('kubernetes') || templateName.includes('aks') || templateName.includes('gke')) return '☸️';
+    if (templateName.includes('key') || templateName.includes('secret')) return '🔐';
+    if (templateName.includes('cdn') || templateName.includes('cache')) return '🚀';
+    if (templateName.includes('queue') || templateName.includes('bus') || templateName.includes('pub')) return '📨';
+    if (templateName.includes('analytics') || templateName.includes('bigquery')) return '📊';
+    return '📦';
+  };
+
+  const handleTemplateClick = (template) => {
+    // Direct selection - no format selection needed (all Terraform)
+    onSelectTemplate(template);
   };
 
   return (
@@ -138,7 +176,7 @@ function ServiceCatalog({ onSelectTemplate }) {
             <span className="font-semibold">Azure</span>
           </div>
           <div className="text-xs mt-1 opacity-75">
-            {templates.filter(t => t.cloud_provider === 'azure').length} templates
+            {templateCounts.azure} templates
           </div>
         </button>
         <button
@@ -154,7 +192,7 @@ function ServiceCatalog({ onSelectTemplate }) {
             <span className="font-semibold">Google Cloud</span>
           </div>
           <div className="text-xs mt-1 opacity-75">
-            {templates.filter(t => t.cloud_provider === 'gcp').length} templates
+            {templateCounts.gcp} templates
           </div>
         </button>
       </div>
@@ -212,26 +250,31 @@ function ServiceCatalog({ onSelectTemplate }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {categoryTemplates.map((template) => (
                     <div
-                      key={template.name}
-                      onClick={() => onSelectTemplate(template)}
-                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group"
+                      key={`${template.name}-${template.format}`}
+                      onClick={() => handleTemplateClick(template)}
+                      className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:shadow-xl hover:border-blue-400 hover:-translate-y-1 transition-all duration-200 cursor-pointer group"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                            {formatTemplateName(template.name)}
-                          </h4>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {getTemplateIcon(template.format)} {template.format.toUpperCase()}
-                          </p>
+                      <div className="flex items-start space-x-3 mb-3">
+                        <div className="text-3xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                          {getServiceIcon(template.name)}
                         </div>
-                        <div className="text-2xl opacity-50 group-hover:opacity-100 transition-opacity">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors text-base leading-tight">
+                            {formatName(template.name)}
+                          </h4>
+                          <div className="flex items-center mt-1 space-x-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              {provider === 'azure' ? 'Azure' : 'GCP'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity text-xl">
                           →
                         </div>
                       </div>
-                      {template.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2">
-                          {template.description}
+                      {template.description && cleanDescription(template.description) && (
+                        <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+                          {cleanDescription(template.description)}
                         </p>
                       )}
                     </div>
@@ -249,6 +292,7 @@ function ServiceCatalog({ onSelectTemplate }) {
           <p className="text-gray-600">No templates found</p>
         </div>
       )}
+
     </div>
   );
 }

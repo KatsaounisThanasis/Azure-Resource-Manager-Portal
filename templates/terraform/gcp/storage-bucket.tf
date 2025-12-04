@@ -1,6 +1,11 @@
 # GCP Cloud Storage Bucket - Equivalent to Azure Storage Account
 # This template creates a Cloud Storage bucket with versioning
 
+variable "project_id" {
+  type        = string
+  description = "GCP project ID"
+}
+
 variable "bucket_name" {
   type        = string
   description = "Name of the GCS bucket (must be globally unique)"
@@ -13,14 +18,13 @@ variable "bucket_name" {
 
 variable "location" {
   type        = string
-  description = "GCS bucket location"
-  default     = "US"
+  description = "GCS bucket location for resource deployment"
+  default = "US"
 }
 
 variable "storage_class" {
   type        = string
-  description = "Storage class"
-  default     = "STANDARD"
+  description = "Storage class - affects cost and access patterns (STANDARD=frequent access, NEARLINE=monthly access, COLDLINE=quarterly access, ARCHIVE=yearly access)"
 
   validation {
     condition = contains([

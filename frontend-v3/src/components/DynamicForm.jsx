@@ -1,31 +1,14 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-const AZURE_REGIONS = [
-  'norwayeast',
-  'swedencentral',
-  'polandcentral',
-  'francecentral',
-  'spaincentral'
-];
-
-const GCP_REGIONS = [
-  'us-central1',
-  'us-east1',
-  'us-west1',
-  'europe-west1',
-  'europe-west2',
-  'asia-east1',
-  'asia-southeast1'
-];
+import { getDynamicOptions, templateAPI } from '../api/client';
 
 function DynamicForm({ provider, template, onSubmit, onCancel }) {
   const [parameters, setParameters] = useState([]);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
+  const [dynamicOptions, setDynamicOptions] = useState({}); // Store dynamic options for parameters
+  const [loadingOptions, setLoadingOptions] = useState({}); // Track loading state per parameter
 
   useEffect(() => {
     if (template) {
@@ -39,12 +22,12 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
     const defaults = {};
 
     if (provider === 'azure') {
-      defaults.subscription_id = '58a01866-f499-4bc5-92ab-dc83166f7792';
-      defaults.location = AZURE_REGIONS[0];
+      defaults.subscription_id = 'USE_ENV_CREDENTIALS';
       defaults.resource_group_name = `rg-${template.name}-${Date.now()}`;
+      // location will be populated from dynamic options
     } else if (provider === 'gcp') {
-      defaults.project_id = 'peppy-booth-478115-i0';
-      defaults.region = 'us-central1';
+      defaults.project_id = 'USE_ENV_CREDENTIALS';
+      // region will be populated from dynamic options
     }
 
     setFormData(defaults);
@@ -55,12 +38,14 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
     setError(null);
 
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/templates/${provider}/${template.name}/parameters`
-      );
+      const response = await templateAPI.getParameters(provider, template.name);
 
       if (response.data.success) {
         const params = response.data.data.parameters;
+        console.log('[DynamicForm] Fetched parameters:', params);
+        console.log('[DynamicForm] Parameters with allowed_values:',
+          params.filter(p => p.allowed_values).map(p => ({ name: p.name, values: p.allowed_values }))
+        );
         setParameters(params);
 
         // Set default values from parameters
@@ -79,24 +64,247 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
     }
   };
 
+  // Fetch dynamic options for specific parameters
+  useEffect(() => {
+    const fetchDynamicOptions = async () => {
+      // Parameters that should have dynamic options
+      const dynamicParamNames = ['vm_size', 'machine_type', 'location', 'region', 'zone'];
+
+      for (const param of parameters) {
+        // Check if this parameter should have dynamic options
+        if (dynamicParamNames.includes(param.name) && !dynamicOptions[param.name]) {
+          setLoadingOptions(prev => ({ ...prev, [param.name]: true }));
+
+          try {
+            // Build context for the API call
+            const context = {
+              location: formData.location,
+              region: formData.region,
+              zone: formData.zone
+            };
+
+            const options = await getDynamicOptions(provider, param.name, context);
+
+            if (options && options.length > 0) {
+              console.log(`[DynamicForm] Loaded ${options.length} dynamic options for ${param.name}`);
+              setDynamicOptions(prev => ({
+                ...prev,
+                [param.name]: options
+              }));
+
+              // Set first option as default if no value is set
+              if (!formData[param.name] && options.length > 0) {
+                setFormData(prev => ({
+                  ...prev,
+                  [param.name]: options[0].name
+                }));
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to fetch dynamic options for ${param.name}:`, error);
+          } finally {
+            setLoadingOptions(prev => ({ ...prev, [param.name]: false }));
+          }
+        }
+      }
+    };
+
+    if (parameters.length > 0) {
+      fetchDynamicOptions();
+    }
+  }, [parameters, provider, formData.location, formData.region]); // Re-fetch when location/region changes
+
   const handleChange = (paramName, value) => {
     setFormData(prev => ({
       ...prev,
       [paramName]: value
     }));
+
+    // Validate on change
+    const error = validateParameter(paramName, value);
+    setValidationErrors(prev => ({
+      ...prev,
+      [paramName]: error
+    }));
+  };
+
+  // Validation function
+  const validateParameter = (paramName, value) => {
+    const param = parameters.find(p => p.name === paramName);
+    if (!param) return null;
+
+    // Required check
+    if (param.required && (!value || value === '')) {
+      return 'This field is required';
+    }
+
+    // Skip validation for empty optional fields
+    if (!value || value === '') return null;
+
+    // Azure-specific validations
+    if (provider === 'azure' || provider === 'terraform-azure') {
+      if (paramName === 'storage_account_name' || paramName.includes('storage') && paramName.includes('name')) {
+        if (!/^[a-z0-9]{3,24}$/.test(value)) {
+          return '3-24 lowercase letters and numbers only';
+        }
+      }
+
+      if (paramName === 'resource_group_name' || paramName === 'resource_group') {
+        if (value.length < 1 || value.length > 90) {
+          return 'Must be 1-90 characters';
+        }
+        if (value.endsWith('.')) {
+          return 'Cannot end with a period';
+        }
+        if (!/^[\w\-\.\(\)]+$/.test(value)) {
+          return 'Can only contain alphanumerics, underscores, hyphens, periods, and parentheses';
+        }
+      }
+    }
+
+    // GCP-specific validations
+    if (provider === 'gcp' || provider === 'terraform-gcp') {
+      if (paramName === 'bucket_name' || paramName === 'instance_name' || paramName === 'cluster_name') {
+        if (value.length < 3 || value.length > 63) {
+          return 'Must be 3-63 characters';
+        }
+        if (!/^[a-z]([-a-z0-9]*[a-z0-9])?$/.test(value)) {
+          return 'Lowercase letters, numbers, hyphens; must start with letter';
+        }
+      }
+
+      if (paramName === 'project_id') {
+        if (value.length < 6 || value.length > 30) {
+          return 'Must be 6-30 characters';
+        }
+        if (!/^[a-z]([-a-z0-9]*[a-z0-9])?$/.test(value)) {
+          return 'Lowercase letters, numbers, hyphens; must start with letter';
+        }
+      }
+    }
+
+    // Common validations for all providers
+    if (paramName === 'cidr_block' || paramName.includes('cidr') || paramName === 'address_space') {
+      if (!/^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/([0-9]|[12][0-9]|3[0-2])$/.test(value)) {
+        return 'Must be valid CIDR notation (e.g., 10.0.0.0/16)';
+      }
+    }
+
+    if (paramName === 'ip_address' || (paramName.includes('ip') && !paramName.includes('cidr'))) {
+      if (!/^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(value)) {
+        return 'Must be valid IPv4 address (e.g., 192.168.1.1)';
+      }
+    }
+
+    if (paramName === 'email' || paramName.includes('email')) {
+      if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) {
+        return 'Must be a valid email address';
+      }
+    }
+
+    // Type-based validations
+    if (param.type === 'number' || param.type === 'int') {
+      if (isNaN(value)) {
+        return 'Must be a number';
+      }
+      if (param.min_value !== undefined && value < param.min_value) {
+        return `Must be at least ${param.min_value}`;
+      }
+      if (param.max_value !== undefined && value > param.max_value) {
+        return `Must be at most ${param.max_value}`;
+      }
+    }
+
+    if (param.type === 'string') {
+      if (param.min_length !== undefined && value.length < param.min_length) {
+        return `Must be at least ${param.min_length} characters`;
+      }
+      if (param.max_length !== undefined && value.length > param.max_length) {
+        return `Must be at most ${param.max_length} characters`;
+      }
+    }
+
+    return null;
+  };
+
+  // Generate smart placeholder examples based on field name
+  const getPlaceholderExample = (param) => {
+    if (param.default) return param.default;
+
+    const name = param.name.toLowerCase();
+
+    // Common Azure/GCP patterns
+    if (name.includes('name')) {
+      if (name.includes('storage')) return 'mystorageacct123';
+      if (name.includes('vm') || name.includes('machine')) return 'my-vm-001';
+      if (name.includes('resource_group') || name.includes('rg')) return 'rg-myproject-prod';
+      if (name.includes('database') || name.includes('db')) return 'mydb-prod';
+      if (name.includes('bucket')) return 'my-gcs-bucket-123';
+      return 'my-resource-name';
+    }
+
+    if (name.includes('project_id')) return 'my-gcp-project-123';
+    if (name.includes('subscription')) return '00000000-0000-0000-0000-000000000000';
+    if (name.includes('sku') || name.includes('tier')) return 'Standard';
+    if (name.includes('size')) return 'Standard_B2s';
+    if (name.includes('version')) return '1.0.0';
+    if (name.includes('port')) return '443';
+    if (name.includes('cpu') || name.includes('cores')) return '2';
+    if (name.includes('memory') || name.includes('ram')) return '4096';
+    if (name.includes('disk') || name.includes('storage_gb')) return '100';
+    if (name.includes('cidr') || name.includes('address_space')) return '10.0.0.0/16';
+    if (name.includes('subnet')) return '10.0.1.0/24';
+    if (name.includes('ip') && name.includes('address')) return '10.0.0.4';
+    if (name.includes('dns')) return 'mydomain.com';
+    if (name.includes('email')) return 'admin@example.com';
+    if (name.includes('username') || name.includes('admin')) return 'azureadmin';
+    if (name.includes('password')) return '••••••••';
+    if (name.includes('tag') || name.includes('label')) return 'production';
+
+    return '';
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Validate all fields before submission
+    const errors = {};
+    parameters.forEach(param => {
+      const error = validateParameter(param.name, formData[param.name]);
+      if (error) {
+        errors[param.name] = error;
+      }
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      // Scroll to first error
+      const firstErrorField = document.getElementById(Object.keys(errors)[0]);
+      if (firstErrorField) {
+        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstErrorField.focus();
+      }
+      return;
+    }
+
     onSubmit(formData);
   };
 
   const renderInput = (param) => {
     const value = formData[param.name] || '';
-    const inputClasses = "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm";
+    const hasError = validationErrors[param.name];
+    const inputClasses = `mt-1 block w-full rounded-md shadow-sm sm:text-sm ${hasError
+        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+        : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+      }`;
 
-    // Special handling for known fields
-    if (param.name === 'location' && provider === 'azure') {
+    // Check if we have dynamic options for this parameter
+    const hasDynamicOptions = dynamicOptions[param.name] && dynamicOptions[param.name].length > 0;
+    const isLoadingDynamicOptions = loadingOptions[param.name];
+
+    // Priority 1: Dynamic options from API (most accurate)
+    if (hasDynamicOptions) {
+      const options = dynamicOptions[param.name];
       return (
         <select
           id={param.name}
@@ -104,15 +312,33 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
           onChange={(e) => handleChange(param.name, e.target.value)}
           required={param.required}
           className={inputClasses}
+          disabled={isLoadingDynamicOptions}
         >
-          {AZURE_REGIONS.map(region => (
-            <option key={region} value={region}>{region}</option>
-          ))}
+          <option value="">
+            {isLoadingDynamicOptions ? 'Loading options...' : `Select ${param.name}...`}
+          </option>
+          {options.map(option => {
+            // For locations/regions, show display_name with technical name in parentheses
+            if (option.display_name && !option.vcpus && !option.memory_gb) {
+              return (
+                <option key={option.name} value={option.name}>
+                  {option.display_name} ({option.name})
+                </option>
+              );
+            }
+            // For VM sizes/machine types, show name with specs
+            return (
+              <option key={option.name} value={option.name}>
+                {option.name} - {option.description || `${option.vcpus || option.memory_gb || ''}`}
+              </option>
+            );
+          })}
         </select>
       );
     }
 
-    if (param.name === 'region' && provider === 'gcp') {
+    // Priority 2: Static allowed_values from template
+    if (param.allowed_values && param.allowed_values.length > 0) {
       return (
         <select
           id={param.name}
@@ -121,8 +347,9 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
           required={param.required}
           className={inputClasses}
         >
-          {GCP_REGIONS.map(region => (
-            <option key={region} value={region}>{region}</option>
+          <option value="">Select {param.name}...</option>
+          {param.allowed_values.map(option => (
+            <option key={option} value={option}>{option}</option>
           ))}
         </select>
       );
@@ -157,7 +384,7 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
             onChange={(e) => handleChange(param.name, parseInt(e.target.value) || 0)}
             required={param.required}
             className={inputClasses}
-            placeholder={param.default?.toString() || ''}
+            placeholder={getPlaceholderExample(param)}
           />
         );
 
@@ -200,8 +427,8 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
       default:
         // Check if there's a validation pattern suggesting password/secret
         const isSecret = param.name.toLowerCase().includes('password') ||
-                        param.name.toLowerCase().includes('secret') ||
-                        param.name.toLowerCase().includes('key');
+          param.name.toLowerCase().includes('secret') ||
+          param.name.toLowerCase().includes('key');
 
         return (
           <input
@@ -211,7 +438,7 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
             onChange={(e) => handleChange(param.name, e.target.value)}
             required={param.required}
             className={inputClasses}
-            placeholder={param.default || ''}
+            placeholder={getPlaceholderExample(param)}
           />
         );
     }
@@ -263,10 +490,18 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
                   {param.required && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 {renderInput(param)}
-                {param.description && param.type !== 'bool' && (
+                {validationErrors[param.name] && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center">
+                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {validationErrors[param.name]}
+                  </p>
+                )}
+                {!validationErrors[param.name] && param.description && param.type !== 'bool' && (
                   <p className="mt-1 text-sm text-gray-500">{param.description}</p>
                 )}
-                {param.validation_message && (
+                {!validationErrors[param.name] && param.validation_message && (
                   <p className="mt-1 text-xs text-gray-400">{param.validation_message}</p>
                 )}
               </div>
@@ -287,10 +522,18 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
                   <span className="text-red-500 ml-1">*</span>
                 </label>
                 {renderInput(param)}
-                {param.description && param.type !== 'bool' && (
+                {validationErrors[param.name] && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center">
+                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {validationErrors[param.name]}
+                  </p>
+                )}
+                {!validationErrors[param.name] && param.description && param.type !== 'bool' && (
                   <p className="mt-1 text-sm text-gray-500">{param.description}</p>
                 )}
-                {param.validation_message && (
+                {!validationErrors[param.name] && param.validation_message && (
                   <p className="mt-1 text-xs text-gray-400">{param.validation_message}</p>
                 )}
               </div>
@@ -314,10 +557,18 @@ function DynamicForm({ provider, template, onSubmit, onCancel }) {
                   {param.name.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                 </label>
                 {renderInput(param)}
-                {param.description && param.type !== 'bool' && (
+                {validationErrors[param.name] && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center">
+                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {validationErrors[param.name]}
+                  </p>
+                )}
+                {!validationErrors[param.name] && param.description && param.type !== 'bool' && (
                   <p className="mt-1 text-sm text-gray-500">{param.description}</p>
                 )}
-                {param.validation_message && (
+                {!validationErrors[param.name] && param.validation_message && (
                   <p className="mt-1 text-xs text-gray-400">{param.validation_message}</p>
                 )}
               </div>

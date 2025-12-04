@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { deploymentAPI } from '../api/client';
 import Tooltip from '../components/Tooltip';
+import { SkeletonCard } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
 
 function Dashboard() {
   const [searchParams] = useSearchParams();
@@ -11,6 +13,15 @@ function Dashboard() {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [statusFilter, setStatusFilter] = useState('all');
   const [providerFilter, setProviderFilter] = useState('all');
+
+  // Format template name - remove dashes and capitalize
+  const formatTemplateName = (name) => {
+    if (!name) return name;
+    return name
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
   const fetchDeployments = async () => {
     try {
@@ -61,9 +72,24 @@ function Dashboard() {
   };
 
   const getProviderIcon = (provider) => {
-    if (provider === 'azure') return '☁️';
-    if (provider === 'gcp') return '🌐';
-    return '🔧';
+    if (provider === 'azure' || provider === 'bicep') return '☁️';
+    if (provider === 'gcp' || provider?.includes('terraform-gcp')) return '🌐';
+    if (provider?.includes('terraform')) return '🔧';
+    return '☁️';
+  };
+
+  // Format provider type for display - hide backend implementation details
+  const formatProviderType = (providerType) => {
+    if (!providerType) return 'Unknown';
+    // Map all Azure variants to just "Azure"
+    if (providerType === 'bicep' || providerType === 'terraform-azure' || providerType === 'azure') {
+      return 'Azure';
+    }
+    // Map all GCP variants to just "Google Cloud"
+    if (providerType === 'terraform-gcp' || providerType === 'gcp') {
+      return 'Google Cloud';
+    }
+    return providerType;
   };
 
   // Calculate stats
@@ -94,8 +120,34 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
+        <div className="sm:flex sm:items-center sm:justify-between mb-10">
+          <div className="sm:flex-auto">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Deployments
+            </h1>
+            <p className="mt-2 text-base text-gray-600">
+              Loading your deployments...
+            </p>
+          </div>
+        </div>
+
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5 mb-8">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="rounded-2xl bg-white p-6 shadow-lg border border-gray-100 animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+              <div className="h-8 bg-gray-200 rounded w-16"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Deployment cards skeleton */}
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -299,7 +351,7 @@ function Dashboard() {
               >
                 <option value="all">All Providers</option>
                 {uniqueProviders.map(provider => (
-                  <option key={provider} value={provider}>{provider}</option>
+                  <option key={provider} value={provider}>{formatProviderType(provider)}</option>
                 ))}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
@@ -437,8 +489,21 @@ function Dashboard() {
               Showing <span className="text-blue-600">{filteredDeployments.length}</span> of {deployments.length} deployments
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredDeployments.map((deployment) => (
+          {filteredDeployments.length === 0 ? (
+            <EmptyState
+              icon="search"
+              title="No deployments found"
+              description={
+                searchTerm || statusFilter !== 'all' || providerFilter !== 'all'
+                  ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                  : 'Get started by creating your first deployment.'
+              }
+              actionLabel={searchTerm || statusFilter !== 'all' || providerFilter !== 'all' ? null : 'Create Deployment'}
+              actionTo={searchTerm || statusFilter !== 'all' || providerFilter !== 'all' ? null : '/deploy'}
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredDeployments.map((deployment) => (
               <div
                 key={deployment.deployment_id}
                 className="group relative bg-white overflow-hidden rounded-2xl border border-gray-200 hover:border-blue-300 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
@@ -474,7 +539,7 @@ function Dashboard() {
 
                   {/* Template Name */}
                   <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">
-                    {deployment.template_name}
+                    {formatTemplateName(deployment.template_name)}
                   </h3>
 
                   {/* Deployment Info */}
@@ -494,7 +559,7 @@ function Dashboard() {
                       </svg>
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-gray-500 text-xs uppercase tracking-wide">Provider</span>
-                        <p className="text-gray-900 truncate">{deployment.provider_type}</p>
+                        <p className="text-gray-900 truncate">{formatProviderType(deployment.provider_type)}</p>
                       </div>
                     </div>
                     <div className="flex items-start">
@@ -543,8 +608,9 @@ function Dashboard() {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,11 @@
 # GCP Compute Engine Instance - Equivalent to Azure Virtual Machine
 # This template creates a Compute Engine VM instance
 
+variable "project_id" {
+  type        = string
+  description = "GCP project ID"
+}
+
 variable "instance_name" {
   type        = string
   description = "Name of the Compute Engine instance"
@@ -8,19 +13,24 @@ variable "instance_name" {
 
 variable "machine_type" {
   type        = string
-  description = "Machine type"
+  description = "Machine type - affects cost and performance (e2-micro=free tier eligible, e2-medium=balanced, n1/n2-standard=production workloads)"
   default     = "e2-micro"
 }
 
 variable "zone" {
   type        = string
-  description = "Zone to create the instance in"
-  default     = "us-central1-a"
+  description = "Zone to create the instance in (region + zone letter)"
+
+  validation {
+    condition = can(regex("^(us-central1|us-east1|us-west1|europe-west1|europe-west2|europe-west4|asia-east1|asia-southeast1)-(a|b|c|d|e|f)$", var.zone))
+    error_message = "Zone must be a valid GCP zone (e.g., us-central1-a, europe-west1-b)"
+  default = "us-central1-a"
+}
 }
 
 variable "image_family" {
   type        = string
-  description = "OS image family"
+  description = "OS image family - affects operating system (debian-12, ubuntu-2204-lts, rocky-linux-9, windows-2022, etc.)"
   default     = "debian-12"
 }
 

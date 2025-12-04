@@ -24,7 +24,7 @@ from .base import (
     DeploymentError,
     ProviderConfigurationError
 )
-from backend.state_backend_manager import StateBackendManager
+from backend.services.state_backend_manager import StateBackendManager
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,22 @@ class TerraformProvider(CloudProvider):
             )
             return result.returncode == 0
         except (subprocess.SubprocessError, FileNotFoundError):
+            return False
+
+    def _check_azure_rg_exists(self, resource_group: str) -> bool:
+        """Check if an Azure resource group exists using az CLI."""
+        try:
+            result = subprocess.run(
+                ["az", "group", "show", "--name", resource_group, "--query", "name", "-o", "tsv"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            exists = result.returncode == 0 and resource_group in result.stdout
+            logger.info(f"Resource group '{resource_group}' exists: {exists}")
+            return exists
+        except Exception as e:
+            logger.warning(f"Could not check if RG exists (assuming it doesn't): {e}")
             return False
 
     def _run_terraform_command(
@@ -179,6 +195,28 @@ class TerraformProvider(CloudProvider):
         # Generate provider configuration
         provider_config = self._generate_provider_block(location)
 
+        # Generate resource_group.tf for Azure (auto-create only if RG doesn't exist)
+        # Check if resource group exists before trying to create it
+        if self.cloud_platform == "azure" and resource_group:
+            rg_exists = self._check_azure_rg_exists(resource_group)
+            if not rg_exists:
+                rg_tf_path = os.path.join(config_dir, "resource_group.tf")
+                with open(rg_tf_path, 'w') as f:
+                    f.write(f'''# Auto-create Resource Group (detected as not existing)
+resource "azurerm_resource_group" "deployment_rg" {{
+  name     = var.resource_group_name
+  location = var.location
+
+  tags = {{
+    ManagedBy = "Terraform"
+    CreatedBy = "MultiCloud-Manager"
+  }}
+}}
+''')
+                logger.info(f"Generated resource_group.tf for auto-creation (RG does not exist)")
+            else:
+                logger.info(f"Resource group '{resource_group}' already exists, skipping auto-creation")
+
         # Generate main.tf
         main_tf_path = os.path.join(config_dir, "main.tf")
         with open(main_tf_path, 'w') as f:
@@ -204,6 +242,7 @@ class TerraformProvider(CloudProvider):
 
         # Generate terraform.tfvars
         tfvars_path = os.path.join(config_dir, "terraform.tfvars")
+        logger.info(f"Generating terraform.tfvars with parameters: {parameters}")
         with open(tfvars_path, 'w') as f:
             for key, value in parameters.items():
                 if isinstance(value, str):
@@ -211,22 +250,40 @@ class TerraformProvider(CloudProvider):
                 else:
                     f.write(f'{key} = {json.dumps(value)}\n')
 
+        # Log the generated tfvars content for debugging
+        with open(tfvars_path, 'r') as f:
+            tfvars_content = f.read()
+            logger.info(f"Generated terraform.tfvars content:\n{tfvars_content}")
+
         logger.info(f"Generated Terraform configuration in {config_dir}")
         return config_dir
 
     def _generate_provider_block(self, location: str) -> str:
-        """Generate cloud provider configuration block."""
-        if self.cloud_platform == "azure":
-            return f"""
-terraform {{
-  required_providers {{
-    azurerm = {{
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
-    }}
-  }}
-}}
+        """Generate cloud provider configuration block.
 
+        Note: Only generates the provider block, not the terraform block.
+        Templates should contain their own terraform block with required_providers.
+        """
+        if self.cloud_platform == "azure":
+            # Get Azure credentials from environment
+            tenant_id = os.getenv('AZURE_TENANT_ID', '')
+            client_id = os.getenv('AZURE_CLIENT_ID', '')
+            client_secret = os.getenv('AZURE_CLIENT_SECRET', '')
+
+            # If service principal credentials are available, use them
+            if tenant_id and client_id and client_secret:
+                return f"""
+provider "azurerm" {{
+  features {{}}
+  subscription_id = "{self.subscription_id or ''}"
+  tenant_id       = "{tenant_id}"
+  client_id       = "{client_id}"
+  client_secret   = "{client_secret}"
+}}
+"""
+            else:
+                # Fallback to Azure CLI authentication (requires 'az login')
+                return f"""
 provider "azurerm" {{
   features {{}}
   subscription_id = "{self.subscription_id or ''}"
@@ -234,30 +291,12 @@ provider "azurerm" {{
 """
         elif self.cloud_platform == "aws":
             return f"""
-terraform {{
-  required_providers {{
-    aws = {{
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }}
-  }}
-}}
-
 provider "aws" {{
   region = "{location or self.region or 'us-east-1'}"
 }}
 """
         elif self.cloud_platform == "gcp":
             return f"""
-terraform {{
-  required_providers {{
-    google = {{
-      source  = "hashicorp/google"
-      version = "~> 5.0"
-    }}
-  }}
-}}
-
 provider "google" {{
   project = "{self.subscription_id or ''}"
   region  = "{location or self.region or 'us-central1'}"
@@ -375,7 +414,7 @@ variable "{key}" {{
             # Plan
             logger.info("Planning Terraform deployment...")
             output, returncode = self._run_terraform_command(
-                ["plan", "-out=tfplan"],
+                ["plan", "-var-file=terraform.tfvars", "-input=false", "-out=tfplan"],
                 working_dir=config_dir
             )
             if returncode != 0:
@@ -387,7 +426,7 @@ variable "{key}" {{
             # Apply
             logger.info("Applying Terraform configuration...")
             output, returncode = self._run_terraform_command(
-                ["apply", "-auto-approve", "tfplan"],
+                ["apply", "-input=false", "-auto-approve", "tfplan"],
                 working_dir=config_dir
             )
             if returncode != 0:

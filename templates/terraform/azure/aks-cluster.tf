@@ -27,6 +27,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "cluster_name" {
   description = "Name of the AKS cluster"
   type        = string
@@ -40,11 +45,7 @@ variable "cluster_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -68,15 +69,14 @@ variable "dns_prefix" {
 }
 
 variable "kubernetes_version" {
-  description = "Kubernetes version (e.g., 1.28, 1.29)"
+  description = "Kubernetes version - affects features and compatibility (e.g., 1.28, 1.29)"
   type        = string
   default     = "1.29"
 }
 
 variable "sku_tier" {
-  description = "SKU tier for the cluster (Free, Standard, Premium)"
+  description = "SKU tier for the cluster - affects cost and SLA (Free = no SLA, Standard = 99.5% SLA, Premium = 99.95% SLA with zone redundancy)"
   type        = string
-  default     = "Free"
 
   validation {
     condition     = contains(["Free", "Standard", "Premium"], var.sku_tier)
@@ -97,7 +97,7 @@ variable "default_node_pool_name" {
 }
 
 variable "default_node_pool_vm_size" {
-  description = "VM size for default node pool"
+  description = "VM size for default node pool - affects cost and performance (e.g., Standard_D2s_v3, Standard_D4s_v3)"
   type        = string
   default     = "Standard_D2s_v3"
 }
@@ -154,9 +154,8 @@ variable "node_os_disk_size_gb" {
 
 # Networking Configuration
 variable "network_plugin" {
-  description = "Network plugin (azure or kubenet)"
+  description = "Network plugin - affects networking capabilities (azure = Azure CNI with pod IPs from VNet, kubenet = basic networking with NAT)"
   type        = string
-  default     = "azure"
 
   validation {
     condition     = contains(["azure", "kubenet"], var.network_plugin)
@@ -165,9 +164,8 @@ variable "network_plugin" {
 }
 
 variable "network_policy" {
-  description = "Network policy (azure or calico)"
+  description = "Network policy - affects pod network security (azure = Azure Network Policies, calico = Calico Network Policies, empty = no network policy)"
   type        = string
-  default     = "azure"
 
   validation {
     condition     = contains(["azure", "calico", ""], var.network_policy)
@@ -176,9 +174,8 @@ variable "network_policy" {
 }
 
 variable "load_balancer_sku" {
-  description = "SKU for load balancer (basic or standard)"
+  description = "SKU for load balancer - affects features (basic = limited features, standard = recommended with availability zones and more features)"
   type        = string
-  default     = "standard"
 
   validation {
     condition     = contains(["basic", "standard"], var.load_balancer_sku)
@@ -237,9 +234,8 @@ variable "enable_http_application_routing" {
 
 # Identity
 variable "identity_type" {
-  description = "Type of identity for AKS cluster (SystemAssigned or UserAssigned)"
+  description = "Type of identity for AKS cluster (SystemAssigned = managed by Azure, UserAssigned = you manage the identity)"
   type        = string
-  default     = "SystemAssigned"
 
   validation {
     condition     = contains(["SystemAssigned", "UserAssigned"], var.identity_type)

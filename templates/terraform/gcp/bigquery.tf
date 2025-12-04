@@ -44,9 +44,9 @@ variable "project_id" {
 }
 
 variable "location" {
-  description = "Dataset location (US, EU, or specific region)"
+  description = "Dataset location - affects data residency and query performance (US, EU, or specific region)"
   type        = string
-  default     = "US"
+  default = "US"
 }
 
 variable "friendly_name" {

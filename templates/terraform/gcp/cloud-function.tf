@@ -1,6 +1,11 @@
 # GCP Cloud Function - Equivalent to Azure Function App / AWS Lambda
 # This template creates a Cloud Function (Gen 2) with HTTP trigger
 
+variable "project_id" {
+  type        = string
+  description = "GCP project ID"
+}
+
 variable "function_name" {
   type        = string
   description = "Name of the Cloud Function"
@@ -8,14 +13,13 @@ variable "function_name" {
 
 variable "region" {
   type        = string
-  description = "Region to deploy the function"
-  default     = "us-central1"
+  description = "GCP region for resource deployment"
+  default = "us-central1"
 }
 
 variable "runtime" {
   type        = string
-  description = "Runtime environment"
-  default     = "python311"
+  description = "Runtime environment - affects what language your function is written in (python311, nodejs20, go121, java17, etc.)"
 
   validation {
     condition = contains([
@@ -38,7 +42,7 @@ variable "entry_point" {
 
 variable "memory_mb" {
   type        = number
-  description = "Memory limit in MB"
+  description = "Memory limit in MB - affects cost and performance"
   default     = 256
 
   validation {

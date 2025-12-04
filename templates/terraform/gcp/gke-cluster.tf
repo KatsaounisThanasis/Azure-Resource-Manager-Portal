@@ -43,20 +43,15 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "GCP region for deployment"
+  description = "GCP region for resource deployment"
   type        = string
-  default     = "us-central1"
+  default = "us-central1"
 }
 
 variable "location_type" {
-  description = "Location type (regional or zonal)"
+  description = "Location type - affects cost and availability (regional=higher availability/cost, zonal=single zone/lower cost)"
   type        = string
-  default     = "regional"
-
-  validation {
-    condition     = contains(["regional", "zonal"], var.location_type)
-    error_message = "Location type must be regional or zonal"
-  }
+  default = "US"
 }
 
 variable "zones" {
@@ -90,9 +85,8 @@ variable "kubernetes_version" {
 }
 
 variable "release_channel" {
-  description = "Release channel (RAPID, REGULAR, STABLE, UNSPECIFIED)"
+  description = "Release channel - affects update frequency (RAPID=latest features, REGULAR=balanced, STABLE=production-ready with delayed updates)"
   type        = string
-  default     = "REGULAR"
 
   validation {
     condition     = contains(["RAPID", "REGULAR", "STABLE", "UNSPECIFIED"], var.release_channel)

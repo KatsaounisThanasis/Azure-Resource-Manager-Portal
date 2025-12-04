@@ -7,7 +7,6 @@ cloud resources across multiple cloud providers (Azure, AWS, GCP).
 
 from .base import CloudProvider, DeploymentResult, ResourceGroup, CloudResource, ProviderType
 from .factory import ProviderFactory, get_provider
-from .azure_native import AzureNativeProvider
 from .terraform_provider import TerraformProvider
 
 __all__ = [
@@ -18,6 +17,5 @@ __all__ = [
     'ProviderType',
     'ProviderFactory',
     'get_provider',
-    'AzureNativeProvider',
     'TerraformProvider'
 ]

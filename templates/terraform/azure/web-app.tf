@@ -26,6 +26,11 @@ terraform {
 # VARIABLES
 # =========================================
 
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID"
+}
+
 variable "web_app_name" {
   description = "Name of the web app"
   type        = string
@@ -39,11 +44,7 @@ variable "web_app_name" {
 variable "location" {
   description = "Azure region for deployment"
   type        = string
-
-  validation {
-    condition     = contains(["norwayeast", "swedencentral", "polandcentral", "francecentral", "spaincentral", "eastus", "westus", "westeurope", "northeurope"], var.location)
-    error_message = "Location must be a valid Azure region"
-  }
+  default = "eastus"
 }
 
 variable "resource_group_name" {
@@ -75,9 +76,8 @@ variable "app_service_plan_id" {
 }
 
 variable "sku_name" {
-  description = "SKU for the App Service Plan (B1, S1, P1v2, etc.)"
+  description = "SKU for the App Service Plan - affects cost and performance (F1/D1=Free/Shared, B1-B3=Basic, S1-S3=Standard with slots, P1v2-P3v3=Premium with better performance)"
   type        = string
-  default     = "B1"
 
   validation {
     condition     = can(regex("^(B[1-3]|S[1-3]|P[1-3]v[2-3]|F1|D1)$", var.sku_name))
@@ -86,9 +86,8 @@ variable "sku_name" {
 }
 
 variable "os_type" {
-  description = "Operating system type for the App Service Plan"
+  description = "Operating system type for the App Service Plan - affects runtime compatibility (Linux recommended for cost and performance, Windows for ASP.NET Framework)"
   type        = string
-  default     = "Linux"
 
   validation {
     condition     = contains(["Linux", "Windows"], var.os_type)
@@ -97,9 +96,8 @@ variable "os_type" {
 }
 
 variable "runtime_stack" {
-  description = "Runtime stack for the web app"
+  description = "Runtime stack for the web app - affects what language your application is written in"
   type        = string
-  default     = "PYTHON"
 
   validation {
     condition     = contains(["DOTNETCORE", "NODE", "PYTHON", "PHP", "JAVA", "RUBY", "GO"], var.runtime_stack)
@@ -166,9 +164,8 @@ variable "enable_https_only" {
 }
 
 variable "minimum_tls_version" {
-  description = "Minimum TLS version"
+  description = "Minimum TLS version - affects security (1.2 or 1.3 recommended for security compliance)"
   type        = string
-  default     = "1.2"
 
   validation {
     condition     = contains(["1.0", "1.1", "1.2", "1.3"], var.minimum_tls_version)

@@ -4,7 +4,7 @@ Integration tests for REST API endpoints
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch, AsyncMock
-from backend.api_rest import app
+from backend.api.routes import app
 from backend.providers.base import DeploymentResult, ResourceGroup, CloudResource
 
 

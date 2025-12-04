@@ -34,50 +34,50 @@ print_warning() {
 check_pytest() {
     if ! command -v pytest &> /dev/null; then
         print_error "pytest not found. Installing test dependencies..."
-        pip install -r requirements-test.txt
+        pip install -r tests/requirements-test.txt
     fi
 }
 
 # Main test commands
 run_all_tests() {
     print_header "Running All Tests"
-    pytest -v
+    pytest -c tests/pytest.ini -v
 }
 
 run_unit_tests() {
     print_header "Running Unit Tests"
-    pytest tests/unit/ -v
+    pytest -c tests/pytest.ini tests/unit/ -v
 }
 
 run_integration_tests() {
     print_header "Running Integration Tests"
-    pytest tests/integration/ -v
+    pytest -c tests/pytest.ini tests/integration/ -v
 }
 
 run_e2e_tests() {
     print_header "Running E2E Tests"
-    pytest tests/e2e/ -v
+    pytest -c tests/pytest.ini tests/e2e/ -v
 }
 
 run_fast_tests() {
     print_header "Running Fast Tests"
-    pytest -v -m "not slow and not docker"
+    pytest -c tests/pytest.ini -v -m "not slow and not docker"
 }
 
 run_with_coverage() {
     print_header "Running Tests with Coverage"
-    pytest --cov=backend --cov-report=html --cov-report=term-missing
+    pytest -c tests/pytest.ini --cov=backend --cov-report=html --cov-report=term-missing
     print_success "Coverage report generated at htmlcov/index.html"
 }
 
 run_specific_test() {
     print_header "Running Specific Test: $1"
-    pytest "$1" -v
+    pytest -c tests/pytest.ini "$1" -v
 }
 
 run_by_marker() {
     print_header "Running Tests with Marker: $1"
-    pytest -v -m "$1"
+    pytest -c tests/pytest.ini -v -m "$1"
 }
 
 # Docker tests
@@ -96,7 +96,7 @@ run_docker_tests() {
         exit 1
     fi
 
-    pytest tests/e2e/test_docker_container.py -v -m docker
+    pytest -c tests/pytest.ini tests/e2e/test_docker_container.py -v -m docker
 }
 
 # CI mode (strict)
@@ -119,10 +119,10 @@ run_ci_tests() {
     bandit -r backend/ -ll || print_warning "Security issues found"
 
     echo -e "${BLUE}6. Unit Tests${NC}"
-    pytest tests/unit/ -v --cov=backend
+    pytest -c tests/pytest.ini tests/unit/ -v --cov=backend
 
     echo -e "${BLUE}7. Integration Tests${NC}"
-    pytest tests/integration/ -v
+    pytest -c tests/pytest.ini tests/integration/ -v
 
     print_success "All CI checks completed"
 }
@@ -136,7 +136,7 @@ run_watch_mode() {
         pip install pytest-watch
     fi
 
-    ptw -- -v
+    ptw -- -c tests/pytest.ini -v
 }
 
 # Parallel execution (requires pytest-xdist)
@@ -148,7 +148,7 @@ run_parallel_tests() {
         pip install pytest-xdist
     fi
 
-    pytest -v -n auto
+    pytest -c tests/pytest.ini -v -n auto
 }
 
 # Show usage
